@@ -1,0 +1,83 @@
+diff --git a/frameworks/base/services/java/com/android/server/PowerManagerService.java b/frameworks/base/services/java/com/android/server/PowerManagerService.java
+index aafe474..f8af35e 100644
+--- a/frameworks/base/services/java/com/android/server/PowerManagerService.java
++++ b/frameworks/base/services/java/com/android/server/PowerManagerService.java
+@@ -111,7 +111,7 @@ public class PowerManagerService extends IPowerManager.Stub
+     private static final int LIGHT_SENSOR_RATE = 1000000;
+ 
+     // For debouncing the proximity sensor in milliseconds
+-    private static final int PROXIMITY_SENSOR_DELAY = 1000;
++    private static final int PROXIMITY_SENSOR_DELAY = 100;
+ 
+     // trigger proximity if distance is less than 5 cm
+     private static final float PROXIMITY_THRESHOLD = 5.0f;
+
+diff --git a/packages/apps/Phone/src/com/android/phone/CallNotifier.java b/packages/apps/Phone/src/com/android/phone/CallNotifier.java
+--- a/packages/apps/Phone/src/com/android/phone/CallNotifier.java
++++ b/packages/apps/Phone/src/com/android/phone/CallNotifier.java
+@@ -39,6 +39,7 @@
+ import android.os.AsyncResult;
+ import android.os.Handler;
+ import android.os.Message;
++import android.os.PowerManager;
+ import android.os.RemoteException;
+ import android.os.SystemProperties;
+ import android.os.SystemVibrator;
+@@ -108,6 +109,9 @@
+     // out...)
+     private boolean mCallWaitingTimeOut = false;
+ 
++    private static PowerManager.WakeLock wakelockcall = null;
++
++
+     // values used to track the query state
+     private static final int CALLERINFO_QUERY_READY = 0;
+     private static final int CALLERINFO_QUERYING = -1;
+@@ -181,6 +185,8 @@
+     // Cached AudioManager
+     private AudioManager mAudioManager;
+ 
++    private PowerManager mPowerManager;
++
+     private Vibrator mVibrator;
+ 
+     /**
+@@ -208,6 +214,7 @@
+ 
+         mAudioManager = (AudioManager) mApplication.getSystemService(Context.AUDIO_SERVICE);
+         mVibrator = (Vibrator) mApplication.getSystemService(Context.VIBRATOR_SERVICE);
++	mPowerManager = (PowerManager) mApplication.getSystemService(Context.POWER_SERVICE);
+ 
+         registerForNotifications();
+ 
+@@ -760,8 +767,30 @@
+      *   - see onNewRingingConnection() for new incoming calls
+      *   - see onDisconnect() for calls being hung up or disconnected
+      */
++
++    //P-SENSOR FIX
++	private static PowerManager powermanager;
++     	private static boolean callstarted = false;
++
+     private void onPhoneStateChanged(AsyncResult r) {
+         Phone.State state = mCM.getState();
++	if ((state == Phone.State.OFFHOOK)&&(!callstarted)){
++                	//powermanager = (PowerManager) mApplication.getSystemService(Context.POWER_SERVICE);
++                		wakelockcall = mPowerManager.newWakeLock(
++                        		PowerManager.PARTIAL_WAKE_LOCK,
++                        		"bring phone call");
++                        wakelockcall.acquire();
++                        callstarted = true;
++                }
++                if ((state == Phone.State.IDLE)&&(callstarted)){
++                	try {
++                		wakelockcall.release();
++					} catch (Exception e) {
++					
++					}
++                	callstarted = false;
++                }
++
+         if (VDBG) log("onPhoneStateChanged: state = " + state);
+ 
+         // Turn status bar notifications on or off depending upon the state

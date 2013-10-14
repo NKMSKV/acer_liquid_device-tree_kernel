@@ -1,0 +1,216 @@
+diff --git a/packages/apps/Settings/src/com/android/settings/wifi/WifiSettings.java b/packages/apps/Settings/src/com/android/settings/wifi/WifiSettings.java
+--- a/packages/apps/Settings/src/com/android/settings/wifi/WifiSettings.java	2013-07-27 04:20:10.881842101 +0600
++++ b/packages/apps/Settings/src/com/android/settings/wifi/WifiSettings.java	2013-07-27 04:13:40.931842000 +0600
+@@ -40,6 +40,7 @@
+ import android.os.Bundle;
+ import android.os.Handler;
+ import android.os.Message;
++import android.os.CountDownTimer;
+ import android.preference.Preference;
+ import android.preference.PreferenceActivity;
+ import android.preference.PreferenceScreen;
+@@ -87,6 +88,50 @@
+  */
+ public class WifiSettings extends SettingsPreferenceFragment
+         implements DialogInterface.OnClickListener  {
++
++
++	// for timer
++	boolean RoverGiveYourAccess = true;
++    	private timer CountDownTimer;					
++	public class timer extends CountDownTimer{
++
++		public timer(long millisInFuture, long countDownInterval) {
++			super(millisInFuture, countDownInterval);
++		}
++
++		@Override
++		public void onFinish() {
++		
++		try {
++		RoverGiveYourAccess=false;
++		mWifiEnabler.pause();
++		Log.i("ROMZESROVER_WIFI_FIX", "timer Finish, try to reload wifi module");
++		mWifiManager.setWifiEnabled(false);
++		mWifiManager.setWifiEnabled(true);
++
++		new CountDownTimer(4000, 1000) {
++     		public void onTick(long millisUntilFinished) {}
++     		public void onFinish() {
++         		Log.i("ROMZESROVER_WIFI_FIX", "timerTwo Finish, try to update List of networks");
++			mWifiEnabler.resume();
++			RoverGiveYourAccess=true;
++			updateAccessPoints();
++     			}
++  		}.start();
++
++            	} catch (Exception e) {
++		Log.e("ROMZESROVER_WIFI_FIX", "Error Exception (Good !)");
++    		}
++
++		
++		}
++
++		@Override
++		public void onTick(long arg0) {}
++	}
++	// for timer
++
++
+     private static final String TAG = "WifiSettings";
+     private static final int MENU_ID_WPS_PBC = Menu.FIRST;
+     private static final int MENU_ID_WPS_PIN = Menu.FIRST + 1;
+@@ -365,6 +410,7 @@
+ 
+     @Override
+     public void onResume() {
++	if (RoverGiveYourAccess) {
+         super.onResume();
+         if (mWifiEnabler != null) {
+             mWifiEnabler.resume();
+@@ -374,10 +420,13 @@
+         if (mKeyStoreNetworkId != INVALID_NETWORK_ID &&
+                 KeyStore.getInstance().state() == KeyStore.State.UNLOCKED) {
+             mWifiManager.connect(mChannel, mKeyStoreNetworkId, mConnectListener);
++		CountDownTimer = new timer (1000, 1000);   		//timer to 1 seconds (tick one second)
++         	CountDownTimer.start();
+         }
+         mKeyStoreNetworkId = INVALID_NETWORK_ID;
+ 
+         updateAccessPoints();
++	}
+     }
+ 
+     @Override
+@@ -467,7 +516,9 @@
+                 return true;
+             case MENU_ID_SCAN:
+                 if (mWifiManager.isWifiEnabled()) {
+-                    mScanner.forceScan();
++                    //mScanner.forceScan();
++			CountDownTimer = new timer (1000, 1000);
++			CountDownTimer.start();
+                 }
+                 return true;
+             case MENU_ID_ADD_NETWORK:
+@@ -513,6 +564,7 @@
+ 
+     @Override
+     public boolean onContextItemSelected(MenuItem item) {
++	if (RoverGiveYourAccess) {
+         if (mSelectedAccessPoint == null) {
+             return super.onContextItemSelected(item);
+         }
+@@ -522,12 +574,16 @@
+                     if (!requireKeyStore(mSelectedAccessPoint.getConfig())) {
+                         mWifiManager.connect(mChannel, mSelectedAccessPoint.networkId,
+                                 mConnectListener);
++			CountDownTimer = new timer (1000, 1000);   		//timer to 1 seconds (tick one second)
++         		CountDownTimer.start();
+                     }
+                 } else if (mSelectedAccessPoint.security == AccessPoint.SECURITY_NONE) {
+                     /** Bypass dialog for unsecured networks */
+                     mSelectedAccessPoint.generateOpenNetworkConfig();
+                     mWifiManager.connect(mChannel, mSelectedAccessPoint.getConfig(),
+                             mConnectListener);
++			CountDownTimer = new timer (1000, 1000);   		//timer to 1 seconds (tick one second)
++         		CountDownTimer.start();
+                 } else {
+                     showDialog(mSelectedAccessPoint, true);
+                 }
+@@ -542,11 +598,13 @@
+                 return true;
+             }
+         }
++	}
+         return super.onContextItemSelected(item);
+     }
+ 
+     @Override
+     public boolean onPreferenceTreeClick(PreferenceScreen screen, Preference preference) {
++	if (RoverGiveYourAccess){
+         if (preference instanceof AccessPoint) {
+             mSelectedAccessPoint = (AccessPoint) preference;
+             /** Bypass dialog for unsecured, unsaved networks */
+@@ -554,12 +612,15 @@
+                     mSelectedAccessPoint.networkId == INVALID_NETWORK_ID) {
+                 mSelectedAccessPoint.generateOpenNetworkConfig();
+                 mWifiManager.connect(mChannel, mSelectedAccessPoint.getConfig(), mConnectListener);
++		CountDownTimer = new timer (1000, 1000);   		//timer to 1 seconds (tick one second)
++         	CountDownTimer.start();
+             } else {
+                 showDialog(mSelectedAccessPoint, false);
+             }
+         } else {
+             return super.onPreferenceTreeClick(screen, preference);
+         }
++	}
+         return true;
+     }
+ 
+@@ -615,6 +676,7 @@
+      * the strength of network and the security for it.
+      */
+     private void updateAccessPoints() {
++	if (RoverGiveYourAccess){
+         // Safeguard from some delayed event handling
+         if (getActivity() == null) return;
+ 
+@@ -645,6 +707,7 @@
+                 addMessagePreference(R.string.wifi_empty_list_wifi_off);
+                 break;
+         }
++	}
+     }
+ 
+     private void addMessagePreference(int messageId) {
+@@ -781,6 +844,7 @@
+     }
+ 
+     private void updateWifiState(int state) {
++	if (RoverGiveYourAccess) {
+         getActivity().invalidateOptionsMenu();
+ 
+         switch (state) {
+@@ -800,6 +864,7 @@
+         mLastInfo = null;
+         mLastState = null;
+         mScanner.pause();
++	}
+     }
+ 
+     private class Scanner extends Handler {
+@@ -856,6 +921,7 @@
+     }
+ 
+     /* package */ void submit(WifiConfigController configController) {
++	if (RoverGiveYourAccess) {
+ 
+         final WifiConfiguration config = configController.getConfig();
+ 
+@@ -865,6 +931,8 @@
+                     && mSelectedAccessPoint.networkId != INVALID_NETWORK_ID) {
+                 mWifiManager.connect(mChannel, mSelectedAccessPoint.networkId,
+                         mConnectListener);
++			CountDownTimer = new timer (1000, 1000);   		//timer to 1 seconds (tick one second)
++         		CountDownTimer.start();
+             }
+         } else if (config.networkId != INVALID_NETWORK_ID) {
+             if (mSelectedAccessPoint != null) {
+@@ -875,6 +943,8 @@
+                 mWifiManager.save(mChannel, config, mSaveListener);
+             } else {
+                 mWifiManager.connect(mChannel, config, mConnectListener);
++			CountDownTimer = new timer (1000, 1000);   		//timer to 1 seconds (tick one second)
++         		CountDownTimer.start();
+             }
+         }
+ 
+@@ -882,6 +952,7 @@
+             mScanner.resume();
+         }
+         updateAccessPoints();
++	}
+     }
+ 
+     /* package */ void forget() {
